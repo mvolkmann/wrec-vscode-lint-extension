@@ -1,0 +1,74 @@
+{
+  "name": "wrec-lint-on-save",
+  "displayName": "Wrec Lint On Save",
+  "description": "Runs the Wrec linter when a saved file defines a class that extends Wrec.",
+  "version": "0.0.1",
+  "publisher": "mvolkmann",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mvolkmann/wrec-lint-on-save-vscode.git"
+  },
+  "homepage": "https://github.com/mvolkmann/wrec-lint-on-save-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/mvolkmann/wrec-lint-on-save-vscode/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "wrec",
+    "web-components",
+    "lint",
+    "typescript",
+    "javascript"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:wrecLintOnSave.lintCurrentFile"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "wrecLintOnSave.lintCurrentFile",
+        "title": "Wrec: Lint Current File"
+      }
+    ],
+    "configuration": {
+      "title": "Wrec Lint On Save",
+      "properties": {
+        "wrecLintOnSave.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable linting Wrec source files when they are saved."
+        },
+        "wrecLintOnSave.npxPath": {
+          "type": "string",
+          "default": "npx",
+          "description": "npx executable used to launch the Wrec linter."
+        },
+        "wrecLintOnSave.showOutput": {
+          "type": "string",
+          "enum": [
+            "never",
+            "onIssues",
+            "always"
+          ],
+          "default": "onIssues",
+          "description": "Control when the Wrec Lint output channel is shown."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.2"
+  }
+}
