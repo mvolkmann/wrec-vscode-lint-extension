@@ -1,49 +1,52 @@
-'use strict';
+"use strict";
 
-const vscode = require('vscode');
-const fs = require('node:fs/promises');
-const path = require('node:path');
-const {execFile} = require('node:child_process');
-const {promisify} = require('node:util');
+const vscode = require("vscode");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const { execFile } = require("node:child_process");
+const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
 const WREC_CLASS_RE = /\bclass\s+[A-Za-z_$][\w$]*\s+extends\s+Wrec\b/;
+const WREC_LINT_MISSING_MESSAGE =
+  "The installed wrec package for this project does not include the wrec-lint CLI. Publish/install a wrec version that ships scripts/lint.js and the wrec-lint bin.";
 const SUPPORTED_LANGUAGE_IDS = new Set([
-  'javascript',
-  'javascriptreact',
-  'typescript',
-  'typescriptreact'
+  "javascript",
+  "javascriptreact",
+  "typescript",
+  "typescriptreact",
 ]);
 const ISSUE_SECTIONS = new Set([
-  'duplicate properties',
-  'reserved property names',
-  'invalid usedBy references',
-  'invalid computed properties',
-  'invalid values configurations',
-  'invalid default values',
-  'invalid form-assoc values',
-  'missing formAssociated property',
-  'missing type properties',
-  'undefined properties',
-  'undefined context functions',
-  'undefined methods',
-  'invalid event handler references',
-  'invalid useState map entries',
-  'incompatible arguments',
-  'type errors',
-  'unsupported html attributes',
-  'unsupported event names'
+  "duplicate properties",
+  "reserved property names",
+  "invalid usedBy references",
+  "invalid computed properties",
+  "invalid values configurations",
+  "invalid default values",
+  "invalid form-assoc values",
+  "missing formAssociated property",
+  "missing type properties",
+  "undefined properties",
+  "undefined context functions",
+  "undefined methods",
+  "invalid event handler references",
+  "invalid useState map entries",
+  "incompatible arguments",
+  "type errors",
+  "unsupported html attributes",
+  "unsupported event names",
 ]);
 
 function activate(context) {
-  const diagnostics = vscode.languages.createDiagnosticCollection('wrec');
-  const output = vscode.window.createOutputChannel('Wrec Lint');
+  const diagnostics = vscode.languages.createDiagnosticCollection("wrec");
+  const output = vscode.window.createOutputChannel("Wrec Lint");
   const runCounters = new Map();
   const missingDependencyWarnings = new Set();
+  const projectRootCache = new Map();
 
   context.subscriptions.push(diagnostics, output);
 
-  async function lintDocument(document, reason = 'manual') {
+  async function lintDocument(document, reason = "manual") {
     if (!shouldProcessDocument(document)) {
       diagnostics.delete(document.uri);
       return;
@@ -51,11 +54,6 @@ function activate(context) {
 
     const config = getConfig(document);
     if (!config.enabled) {
-      diagnostics.delete(document.uri);
-      return;
-    }
-
-    if (!definesWrecClass(document.getText())) {
       diagnostics.delete(document.uri);
       return;
     }
@@ -71,7 +69,8 @@ function activate(context) {
 
     const projectRoot = await findWrecProjectRoot(
       path.dirname(document.fileName),
-      workspaceFolder.uri.fsPath
+      workspaceFolder.uri.fsPath,
+      projectRootCache,
     );
     if (!projectRoot) {
       diagnostics.delete(document.uri);
@@ -79,23 +78,31 @@ function activate(context) {
       if (!missingDependencyWarnings.has(warningKey)) {
         missingDependencyWarnings.add(warningKey);
         vscode.window.showWarningMessage(
-          'Wrec Lint On Save only runs in workspaces whose package.json declares a dependency on wrec.'
+          "Wrec Lint On Save only runs in workspaces whose package.json declares a dependency on wrec.",
         );
       }
       return;
     }
 
-    output.appendLine(`[${new Date().toISOString()}] Linting ${document.fileName} (${reason})`);
+    if (!definesWrecClass(document.getText())) {
+      diagnostics.delete(document.uri);
+      return;
+    }
+
+    output.appendLine(
+      `[${new Date().toISOString()}] Linting ${document.fileName} (${reason})`,
+    );
 
     try {
-      const {stdout, stderr} = await execFileAsync(
-        config.npxPath,
-        ['wrec-lint', document.fileName],
+      const lintCommand = await resolveLintCommand(projectRoot, config.npxPath);
+      const { stdout, stderr } = await execFileAsync(
+        lintCommand.command,
+        [...lintCommand.args, document.fileName],
         {
           cwd: projectRoot,
           env: process.env,
-          maxBuffer: 10 * 1024 * 1024
-        }
+          maxBuffer: 10 * 1024 * 1024,
+        },
       );
 
       if (isStaleRun(document, currentRun, runCounters)) return;
@@ -118,50 +125,60 @@ function activate(context) {
         new vscode.Diagnostic(
           firstLineRange(document),
           errorMessageFrom(error),
-          vscode.DiagnosticSeverity.Error
-        )
+          vscode.DiagnosticSeverity.Error,
+        ),
       ]);
 
       output.appendLine(errorMessageFrom(error));
-      maybeShowOutput(output, 'always', true);
+      maybeShowOutput(output, "always", true);
     }
   }
 
   context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument(document => {
-      void lintDocument(document, 'save');
-    })
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      void lintDocument(document, "save");
+    }),
   );
 
   context.subscriptions.push(
-    vscode.workspace.onDidDeleteFiles(event => {
+    vscode.workspace.onDidDeleteFiles((event) => {
       for (const file of event.files) {
         diagnostics.delete(file);
       }
-    })
+    }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('wrecLintOnSave.lintCurrentFile', async () => {
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      projectRootCache.clear();
+      missingDependencyWarnings.clear();
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("wrec.lintCurrentFile", async () => {
       const document = vscode.window.activeTextEditor?.document;
       if (!document) return;
-      await lintDocument(document, 'command');
-    })
+      await lintDocument(document, "command");
+    }),
   );
 }
 
 function deactivate() {}
 
 function shouldProcessDocument(document) {
-  return document.uri.scheme === 'file' && SUPPORTED_LANGUAGE_IDS.has(document.languageId);
+  return (
+    document.uri.scheme === "file" &&
+    SUPPORTED_LANGUAGE_IDS.has(document.languageId)
+  );
 }
 
 function getConfig(document) {
-  const config = vscode.workspace.getConfiguration('wrecLintOnSave', document.uri);
+  const config = vscode.workspace.getConfiguration("wrec", document.uri);
   return {
-    enabled: config.get('enabled', true),
-    npxPath: config.get('npxPath', 'npx'),
-    showOutput: config.get('showOutput', 'onIssues')
+    enabled: config.get("enabled", true),
+    npxPath: config.get("npxPath", "npx"),
+    showOutput: config.get("showOutput", "onIssues"),
   };
 }
 
@@ -169,16 +186,24 @@ function definesWrecClass(text) {
   return WREC_CLASS_RE.test(text);
 }
 
-async function findWrecProjectRoot(startDirectory, workspaceRoot) {
+async function findWrecProjectRoot(startDirectory, workspaceRoot, cache) {
   let currentDirectory = startDirectory;
   const normalizedWorkspaceRoot = path.resolve(workspaceRoot);
 
   while (isWithinDirectory(currentDirectory, normalizedWorkspaceRoot)) {
-    const packageJsonPath = path.join(currentDirectory, 'package.json');
+    const cachedProjectRoot = cache.get(currentDirectory);
+    if (cachedProjectRoot !== undefined) {
+      return cachedProjectRoot;
+    }
+
+    const packageJsonPath = path.join(currentDirectory, "package.json");
 
     try {
-      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
+      const packageJson = JSON.parse(
+        await fs.readFile(packageJsonPath, "utf8"),
+      );
       if (hasWrecDependency(packageJson)) {
+        cache.set(currentDirectory, currentDirectory);
         return currentDirectory;
       }
     } catch {
@@ -193,9 +218,11 @@ async function findWrecProjectRoot(startDirectory, workspaceRoot) {
     if (parentDirectory === currentDirectory) {
       break;
     }
+    cache.set(currentDirectory, null);
     currentDirectory = parentDirectory;
   }
 
+  cache.set(startDirectory, null);
   return null;
 }
 
@@ -204,42 +231,83 @@ function hasWrecDependency(packageJson) {
     packageJson.dependencies,
     packageJson.devDependencies,
     packageJson.optionalDependencies,
-    packageJson.peerDependencies
+    packageJson.peerDependencies,
   ];
 
-  return dependencySections.some(section => Boolean(section && section.wrec));
+  return dependencySections.some((section) => Boolean(section && section.wrec));
 }
 
 function isWithinDirectory(candidatePath, parentPath) {
   const relativePath = path.relative(parentPath, candidatePath);
-  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+  return (
+    relativePath === "" ||
+    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+  );
+}
+
+async function resolveLintCommand(projectRoot, npxPath) {
+  const localBinPath = path.join(
+    projectRoot,
+    "node_modules",
+    ".bin",
+    executableName("wrec-lint"),
+  );
+  if (await fileExists(localBinPath)) {
+    return { command: localBinPath, args: [] };
+  }
+
+  const packagedScriptPath = path.join(
+    projectRoot,
+    "node_modules",
+    "wrec",
+    "scripts",
+    "lint.js",
+  );
+  if (await fileExists(packagedScriptPath)) {
+    return { command: "node", args: [packagedScriptPath] };
+  }
+
+  throw new Error(WREC_LINT_MISSING_MESSAGE);
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function executableName(baseName) {
+  return process.platform === "win32" ? `${baseName}.cmd` : baseName;
 }
 
 function parseDiagnostics(report, document) {
-  if (!report || report.includes('no issues found')) return [];
+  if (!report || report.includes("no issues found")) return [];
 
   const diagnostics = [];
   const lines = report.split(/\r?\n/);
-  let currentSection = '';
+  let currentSection = "";
 
   for (const line of lines) {
     if (!line.trim()) continue;
 
-    if (!line.startsWith('  ') && line.endsWith(':')) {
+    if (!line.startsWith("  ") && line.endsWith(":")) {
       currentSection = line.slice(0, -1);
       continue;
     }
 
     if (!ISSUE_SECTIONS.has(currentSection)) continue;
-    if (!line.startsWith('  ')) continue;
+    if (!line.startsWith("  ")) continue;
 
     const message = `${startCase(currentSection)}: ${line.trim()}`;
     diagnostics.push(
       new vscode.Diagnostic(
         findBestRange(document, currentSection, line.trim()),
         message,
-        diagnosticSeverity(currentSection)
-      )
+        diagnosticSeverity(currentSection),
+      ),
     );
   }
 
@@ -248,11 +316,11 @@ function parseDiagnostics(report, document) {
 
 function diagnosticSeverity(section) {
   if (
-    section === 'undefined properties' ||
-    section === 'undefined context functions' ||
-    section === 'undefined methods' ||
-    section === 'invalid event handler references' ||
-    section === 'type errors'
+    section === "undefined properties" ||
+    section === "undefined context functions" ||
+    section === "undefined methods" ||
+    section === "invalid event handler references" ||
+    section === "type errors"
   ) {
     return vscode.DiagnosticSeverity.Error;
   }
@@ -269,11 +337,11 @@ function findBestRange(document, section, detail) {
   }
 
   if (
-    section === 'duplicate properties' ||
-    section === 'reserved property names' ||
-    section === 'undefined properties' ||
-    section === 'undefined context functions' ||
-    section === 'undefined methods'
+    section === "duplicate properties" ||
+    section === "reserved property names" ||
+    section === "undefined properties" ||
+    section === "undefined context functions" ||
+    section === "undefined methods"
   ) {
     candidateTerms.add(detail.trim());
   }
@@ -289,15 +357,15 @@ function findBestRange(document, section, detail) {
 function findTermRange(document, term) {
   const escaped = escapeRegExp(term);
   const patterns = [
-    new RegExp(`\\b${escaped}\\b`, 'g'),
-    new RegExp(escaped, 'g')
+    new RegExp(`\\b${escaped}\\b`, "g"),
+    new RegExp(escaped, "g"),
   ];
 
   const text = document.getText();
 
   for (const pattern of patterns) {
     const match = pattern.exec(text);
-    if (!match || typeof match.index !== 'number') continue;
+    if (!match || typeof match.index !== "number") continue;
 
     const start = document.positionAt(match.index);
     const end = document.positionAt(match.index + match[0].length);
@@ -313,7 +381,7 @@ function firstLineRange(document) {
 }
 
 function maybeShowOutput(output, mode, hasIssues) {
-  if (mode === 'always' || (mode === 'onIssues' && hasIssues)) {
+  if (mode === "always" || (mode === "onIssues" && hasIssues)) {
     output.show(true);
   }
 }
@@ -323,10 +391,10 @@ function isStaleRun(document, currentRun, runCounters) {
 }
 
 function errorMessageFrom(error) {
-  if (error && typeof error === 'object') {
-    const stderr = typeof error.stderr === 'string' ? error.stderr.trim() : '';
-    const message = error.message || '';
-    return stderr || message || 'Wrec linter failed.';
+  if (error && typeof error === "object") {
+    const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
+    const message = error.message || "";
+    return stderr || message || "Wrec linter failed.";
   }
 
   return String(error);
@@ -337,10 +405,10 @@ function startCase(text) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 module.exports = {
   activate,
-  deactivate
+  deactivate,
 };

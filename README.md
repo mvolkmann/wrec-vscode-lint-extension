@@ -10,9 +10,9 @@ and reported issues are surfaced as diagnostics in the editor.
 
 ## Settings
 
-- `wrecLintOnSave.enabled`: enable or disable the extension
-- `wrecLintOnSave.npxPath`: path to the `npx` executable
-- `wrecLintOnSave.showOutput`: `never`, `onIssues`, or `always`
+- `wrec.enabled`: enable or disable the extension
+- `wrec.npxPath`: path to the `npx` executable
+- `wrec.showOutput`: `never`, `onIssues`, or `always`
 
 ## Command
 
@@ -20,22 +20,18 @@ and reported issues are surfaced as diagnostics in the editor.
 
 ## Publishing
 
-Install dependencies and package the extension:
+To publish a new version,
+bump the version number in `package.json`
+and run the following commands.
 
 ```bash
 npm install
 npm run package
+npm run publish
 ```
 
-Then publish with your VS Code Marketplace publisher credentials:
-
-```bash
-npx @vscode/vsce publish
-```
-
-To publish a new version, bump the version number in `package.json`,
-browse https://marketplace.visualstudio.com/manage/publishers/rmarkvolkmann,
+Then browse https://marketplace.visualstudio.com/manage/publishers/rmarkvolkmann,
 click the vertical ellipsis after the extension name "wrec",
 select "Update", and drag the new `.vsix` file into the dialog.
-It will take several minutes (10?) to verify the new version
+It may take around 10 minutes to verify the new version
 before it becomes live in the Marketplace.

@@ -2,9 +2,10 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Runs 'npx wrec-lint' when a saved file defines a class that extends Wrec.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
+  "icon": "logo.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/mvolkmann/wrec-lint-on-save-vscode.git"
@@ -29,30 +30,30 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:wrecLintOnSave.lintCurrentFile"
+    "onCommand:wrec.lintCurrentFile"
   ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "wrecLintOnSave.lintCurrentFile",
+        "command": "wrec.lintCurrentFile",
         "title": "Wrec: Lint Current File"
       }
     ],
     "configuration": {
       "title": "Wrec Lint On Save",
       "properties": {
-        "wrecLintOnSave.enabled": {
+        "wrec.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable linting Wrec source files when they are saved."
         },
-        "wrecLintOnSave.npxPath": {
+        "wrec.npxPath": {
           "type": "string",
           "default": "npx",
           "description": "npx executable used to launch the Wrec linter."
         },
-        "wrecLintOnSave.showOutput": {
+        "wrec.showOutput": {
           "type": "string",
           "enum": [
             "never",
@@ -66,7 +67,8 @@
     }
   },
   "scripts": {
-    "package": "npx @vscode/vsce package"
+    "package": "npx @vscode/vsce package",
+    "publish": "npx @vscode/vsce publish"
   },
   "devDependencies": {
     "@vscode/vsce": "^3.6.2"
