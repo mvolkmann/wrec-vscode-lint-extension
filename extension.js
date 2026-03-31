@@ -69,8 +69,11 @@ function activate(context) {
     const currentRun = (runCounters.get(document.uri.toString()) ?? 0) + 1;
     runCounters.set(document.uri.toString(), currentRun);
 
-    const hasWrecDependency = await workspaceDependsOnWrec(workspaceFolder.uri.fsPath);
-    if (!hasWrecDependency) {
+    const projectRoot = await findWrecProjectRoot(
+      path.dirname(document.fileName),
+      workspaceFolder.uri.fsPath
+    );
+    if (!projectRoot) {
       diagnostics.delete(document.uri);
       const warningKey = workspaceFolder.uri.fsPath;
       if (!missingDependencyWarnings.has(warningKey)) {
@@ -89,7 +92,7 @@ function activate(context) {
         config.npxPath,
         ['wrec-lint', document.fileName],
         {
-          cwd: workspaceFolder.uri.fsPath,
+          cwd: projectRoot,
           env: process.env,
           maxBuffer: 10 * 1024 * 1024
         }
@@ -166,15 +169,34 @@ function definesWrecClass(text) {
   return WREC_CLASS_RE.test(text);
 }
 
-async function workspaceDependsOnWrec(workspaceRoot) {
-  const packageJsonPath = path.join(workspaceRoot, 'package.json');
+async function findWrecProjectRoot(startDirectory, workspaceRoot) {
+  let currentDirectory = startDirectory;
+  const normalizedWorkspaceRoot = path.resolve(workspaceRoot);
 
-  try {
-    const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
-    return hasWrecDependency(packageJson);
-  } catch {
-    return false;
+  while (isWithinDirectory(currentDirectory, normalizedWorkspaceRoot)) {
+    const packageJsonPath = path.join(currentDirectory, 'package.json');
+
+    try {
+      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
+      if (hasWrecDependency(packageJson)) {
+        return currentDirectory;
+      }
+    } catch {
+      // Ignore missing or invalid package.json files while walking upward.
+    }
+
+    if (currentDirectory === normalizedWorkspaceRoot) {
+      break;
+    }
+
+    const parentDirectory = path.dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      break;
+    }
+    currentDirectory = parentDirectory;
   }
+
+  return null;
 }
 
 function hasWrecDependency(packageJson) {
@@ -186,6 +208,11 @@ function hasWrecDependency(packageJson) {
   ];
 
   return dependencySections.some(section => Boolean(section && section.wrec));
+}
+
+function isWithinDirectory(candidatePath, parentPath) {
+  const relativePath = path.relative(parentPath, candidatePath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
 }
 
 function parseDiagnostics(report, document) {
