@@ -9,3 +9,7 @@
 ## 0.1.1
 
 - First stable release
+
+## 0.1.2
+
+- Fixed handling of the `wrec.showOutput` setting.

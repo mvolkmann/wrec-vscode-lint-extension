@@ -126,7 +126,7 @@ function activate(context) {
       ]);
 
       output.appendLine(errorMessageFrom(error));
-      maybeShowOutput(output, "always", true);
+      maybeShowOutput(output, config.showOutput, true);
     }
   }
 
@@ -375,9 +375,17 @@ function firstLineRange(document) {
 }
 
 function maybeShowOutput(output, mode, hasIssues) {
-  if (mode === "always" || (mode === "onIssues" && hasIssues)) {
+  if (mode === "always") {
     output.show(true);
+    return;
   }
+
+  if (mode === "onIssues" && hasIssues) {
+    output.show(true);
+    return;
+  }
+
+  output.hide();
 }
 
 function isStaleRun(document, currentRun, runCounters) {

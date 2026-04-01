@@ -2,7 +2,7 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Runs 'npx wrec-lint' when a saved file defines a class that extends Wrec.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
