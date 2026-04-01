@@ -2,7 +2,7 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Runs 'npx wrec-lint' when a saved file defines a class that extends Wrec.",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
@@ -37,22 +37,12 @@
     "commands": [
       {
         "command": "wrec.lintCurrentFile",
-        "title": "Wrec: Lint Current File"
+        "title": "wrec: Lint Current File"
       }
     ],
     "configuration": {
-      "title": "Wrec Lint On Save",
+      "title": "wrec Lint On Save",
       "properties": {
-        "wrec.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable linting Wrec source files when they are saved."
-        },
-        "wrec.npxPath": {
-          "type": "string",
-          "default": "npx",
-          "description": "npx executable used to launch the Wrec linter."
-        },
         "wrec.showOutput": {
           "type": "string",
           "enum": [

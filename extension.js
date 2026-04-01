@@ -53,10 +53,6 @@ function activate(context) {
     }
 
     const config = getConfig(document);
-    if (!config.enabled) {
-      diagnostics.delete(document.uri);
-      return;
-    }
 
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     if (!workspaceFolder) {
@@ -94,7 +90,7 @@ function activate(context) {
     );
 
     try {
-      const lintCommand = await resolveLintCommand(projectRoot, config.npxPath);
+      const lintCommand = await resolveLintCommand(projectRoot);
       const { stdout, stderr } = await execFileAsync(
         lintCommand.command,
         [...lintCommand.args, document.fileName],
@@ -176,8 +172,6 @@ function shouldProcessDocument(document) {
 function getConfig(document) {
   const config = vscode.workspace.getConfiguration("wrec", document.uri);
   return {
-    enabled: config.get("enabled", true),
-    npxPath: config.get("npxPath", "npx"),
     showOutput: config.get("showOutput", "onIssues"),
   };
 }
@@ -245,7 +239,7 @@ function isWithinDirectory(candidatePath, parentPath) {
   );
 }
 
-async function resolveLintCommand(projectRoot, npxPath) {
+async function resolveLintCommand(projectRoot) {
   const localBinPath = path.join(
     projectRoot,
     "node_modules",
