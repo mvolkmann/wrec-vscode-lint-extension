@@ -35,6 +35,7 @@ const ISSUE_SECTIONS = new Set([
   "type errors",
   "unsupported html attributes",
   "unsupported event names",
+  "invalid html nesting",
 ]);
 
 function activate(context) {
@@ -328,6 +329,12 @@ function findBestRange(document, section, detail) {
   for (const match of quotedMatches) {
     const term = match[1].trim();
     if (term) candidateTerms.add(term);
+  }
+
+  const htmlTagMatches = detail.matchAll(/<([A-Za-z][\w-]*)>/g);
+  for (const match of htmlTagMatches) {
+    const tagName = match[1].trim();
+    if (tagName) candidateTerms.add(`<${tagName}`);
   }
 
   if (
