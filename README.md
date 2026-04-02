@@ -26,6 +26,7 @@ The issues detected include:
 - invalid `form-assoc` values
 - invalid `useState` map entries
 - unsupported HTML attributes in templates
+- invalid HTML element nesting in templates
 
 Lint output is written to the `Wrec Lint` output channel,
 and reported issues are surfaced as diagnostics in the editor.
