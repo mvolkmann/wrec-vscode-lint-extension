@@ -27,6 +27,7 @@ The issues detected include:
 - invalid `useState` map entries
 - unsupported HTML attributes in templates
 - invalid HTML element nesting in templates
+- duplicate ref attribute values
 
 Lint output is written to the `Wrec Lint` output channel,
 and reported issues are surfaced as diagnostics in the editor.
