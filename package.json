@@ -1,8 +1,8 @@
 {
   "name": "wrec",
   "displayName": "wrec",
-  "description": "Runs 'npx wrec-lint' when a saved file defines a class that extends Wrec.",
-  "version": "0.2.2",
+  "description": "Provides commands to run three scripts provided by the wrec package.",
+  "version": "0.2.3",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
@@ -38,16 +38,16 @@
   "contributes": {
     "commands": [
       {
+        "command": "wrec.scaffoldComponent",
+        "title": "wrec: Scaffold New Component"
+      },
+      {
         "command": "wrec.lintCurrentFile",
         "title": "wrec: Lint Current File"
       },
       {
         "command": "wrec.usedByCurrentFile",
         "title": "wrec: Set usedBy Properties in Current File"
-      },
-      {
-        "command": "wrec.scaffoldComponent",
-        "title": "wrec: Scaffold New Component"
       }
     ],
     "configuration": {

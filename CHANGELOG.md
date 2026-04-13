@@ -1,10 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- Added a built-in scaffold fallback so `Wrec: Scaffold New Component` still
-  works when the installed `wrec` package does not publish `wrec-scaffold`
-
 ## 0.0.1
 
 - Initial release
@@ -22,3 +17,8 @@
 ## 0.2.0
 
 - Fixed source file path passed to lint script.
+
+## 0.2.3
+
+- Added commands to scaffold a new component
+  and add/modify usedBy properties.

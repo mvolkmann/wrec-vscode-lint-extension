@@ -1,11 +1,45 @@
-# wrec Linter
+# wrec
 
-This VS Code extension runs `npx wrec-lint <file>` whenever you save
-a JavaScript or TypeScript file that defines a class extending `Wrec`.
+This VS Code extension adds three commands that are helpful when implementing
+[wrec](https://github.com/mvolkmann/wrec) web components.
 
-It only runs in workspaces whose `package.json` declares a dependency on `wrec`.
+## Commands
 
-The issues detected include:
+- wrec: Scaffold New Component
+
+  This prompts for a tag name and generates a `.ts` file
+  containing starter code for a new web component
+  where the class name is the CamelCase version of the tag name.
+
+- wrec: Lint Current File
+
+  This runs wrec-specific linting checks
+  on the currently open and focused source file.
+  While this is running, "Wrec lint" will be displayed in the status bar.
+  When it completes, the status bar will display
+  either "Wrec ok" or "Wrec {issue-count"}".
+  If any issues are discovered,
+  the "OUTPUT" panel is opened and they are displayed there.
+  Also, lines where the issues are found are marked with
+  a yellow squiggly and hovering over it displays an error message.
+
+- wrec: Set usedBy Properties in Current File
+
+  This adds/updates `usedBy` properties in the property configuration objects
+  found in the `static properties =` object.
+  These are necessary when reactive JavaScript expressions
+  do not explicitly reference every property they use.
+  In that case, wrec relies on `usedBy` properties,
+  to determine when to reevaluate the expressions.
+
+All these commands run a script in the wrec package.
+The `package.json` file for the project that is opened in VS Code
+must have a dependency on the wrec package and
+it must be installed to use these commands.
+
+## Lint Issues
+
+The lint issues detected include:
 
 - undefined properties accessed in expressions
 - undefined instance methods called in expressions
@@ -31,31 +65,6 @@ The issues detected include:
 - invalid ref attribute targets
 - duplicate ref attribute values
 
-Lint output is written to the `Wrec Lint` output channel,
-and reported issues are surfaced as diagnostics in the editor.
-The extension also adds a status bar item so you can tell when it is active
-and when linting is in progress.
-
-## Settings
+## Lint Settings
 
 - `wrec.showOutput`: `never`, `onIssues`, or `always`
-
-## Command
-
-- `wrec: Lint Current File`
-- `wrec: Used By Current File`
-- `wrec: Scaffold Component`
-
-The scaffold command prompts for a custom element tag name and passes it to the
-Wrec scaffold script. If the installed `wrec` package does not publish that CLI,
-the extension falls back to the built-in Wrec component template.
-
-## Status Bar
-
-The status bar item:
-
-- shows `Wrec active` after the extension activates
-- shows a spinner while linting is running
-- shows an issue count when linting finds problems
-- shows an error state if the lint command fails
-- can be clicked to lint the current file manually

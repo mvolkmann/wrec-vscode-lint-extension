@@ -14,27 +14,6 @@ const WREC_USED_BY_MISSING_MESSAGE =
   "The installed wrec package for this project does not include the wrec-used-by CLI. Publish/install a wrec version that ships scripts/used-by.js and the wrec-used-by bin.";
 const WREC_SCAFFOLD_MISSING_MESSAGE =
   "The installed wrec package for this project does not include the wrec-scaffold CLI. Publish/install a wrec version that ships scripts/scaffold.js and the wrec-scaffold bin.";
-const WREC_SCAFFOLD_TEMPLATE = `import {css, html, Wrec} from 'wrec';
-
-class {class} extends Wrec {
-  static properties = {
-    name: {type: String, value: 'World'},
-  };
-
-  static css = css\`
-    p {
-      color: blue;
-      font-family: fantasy;
-    }
-  \`;
-
-  static html = html\`
-    <p>Hello, <span>this.name</span>!</p>
-  \`;
-}
-
-{class}.define('{tag}');
-`;
 const SUPPORTED_LANGUAGE_IDS = new Set([
   "javascript",
   "javascriptreact",
@@ -77,7 +56,6 @@ function activate(context) {
   let activeLintRuns = 0;
 
   statusBarItem.name = "Wrec Lint";
-  statusBarItem.command = "wrec.lintCurrentFile";
   statusBarItem.show();
   updateStatusBar(statusBarItem, "idle");
 
@@ -275,11 +253,6 @@ function errorMessageFrom(error) {
   return String(error);
 }
 
-// Detects when scaffold should fall back to the built-in template.
-function isMissingScaffoldCommandError(error) {
-  return errorMessageFrom(error) === WREC_SCAFFOLD_MISSING_MESSAGE;
-}
-
 // Escapes special regex characters in arbitrary text before building a pattern.
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -475,12 +448,12 @@ function updateStatusBar(
 ) {
   const fileLabel = fileName ? path.basename(fileName) : undefined;
   const action = details.action ?? "lint";
-  const clickHint =
+  const actionHint =
     action === "used-by"
-      ? "Click to run Used By on the current file."
+      ? "Use the command palette to run Set usedBy Properties."
       : action === "scaffold"
         ? "Use the command palette to scaffold a component."
-      : "Click to lint the current file.";
+        : "Lint runs automatically on save.";
 
   switch (state) {
     case "running":
@@ -492,22 +465,22 @@ function updateStatusBar(
             : `$(sync~spin) Wrec lint`;
       statusBarItem.tooltip = fileLabel
         ? action === "used-by"
-          ? `Wrec is running used by for ${fileLabel}. ${clickHint}`
+          ? `Wrec is running used by for ${fileLabel}. ${actionHint}`
           : action === "scaffold"
-            ? `Wrec is scaffolding ${fileLabel}. ${clickHint}`
-          : `Wrec is linting ${fileLabel}. ${clickHint}`
+            ? `Wrec is scaffolding ${fileLabel}. ${actionHint}`
+            : `Wrec is linting ${fileLabel}. ${actionHint}`
         : action === "used-by"
-          ? `Wrec is running used by. ${clickHint}`
+          ? `Wrec is running used by. ${actionHint}`
           : action === "scaffold"
-            ? `Wrec is scaffolding a component. ${clickHint}`
-          : `Wrec is linting. ${clickHint}`;
+            ? `Wrec is scaffolding a component. ${actionHint}`
+            : `Wrec is linting. ${actionHint}`;
       statusBarItem.backgroundColor = undefined;
       return;
     case "issues":
       statusBarItem.text = `$(warning) Wrec ${issueCount}`;
       statusBarItem.tooltip = fileLabel
-        ? `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"} in ${fileLabel}. ${clickHint}`
-        : `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"}. ${clickHint}`;
+        ? `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"} in ${fileLabel}. ${actionHint}`
+        : `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"}. ${actionHint}`;
       statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.warningBackground",
       );
@@ -519,12 +492,12 @@ function updateStatusBar(
           ? `Wrec used by failed: ${details.message}`
           : action === "scaffold"
             ? `Wrec scaffold failed: ${details.message}`
-          : `Wrec lint failed: ${details.message}`
+            : `Wrec lint failed: ${details.message}`
         : action === "used-by"
-          ? `Wrec used by failed. ${clickHint}`
+          ? `Wrec used by failed. ${actionHint}`
           : action === "scaffold"
-            ? `Wrec scaffold failed. ${clickHint}`
-          : `Wrec lint failed. ${clickHint}`;
+            ? `Wrec scaffold failed. ${actionHint}`
+            : `Wrec lint failed. ${actionHint}`;
       statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.errorBackground",
       );
@@ -533,21 +506,20 @@ function updateStatusBar(
       statusBarItem.text = `$(pass) Wrec ok`;
       statusBarItem.tooltip = fileLabel
         ? action === "used-by"
-          ? `Wrec finished used by for ${fileLabel}. ${clickHint}`
+          ? `Wrec finished used by for ${fileLabel}. ${actionHint}`
           : action === "scaffold"
-            ? `Wrec scaffolded ${fileLabel}. ${clickHint}`
-          : `Wrec found no issues in ${fileLabel}. ${clickHint}`
+            ? `Wrec scaffolded ${fileLabel}. ${actionHint}`
+            : `Wrec found no issues in ${fileLabel}. ${actionHint}`
         : action === "used-by"
-          ? `Wrec finished used by. ${clickHint}`
+          ? `Wrec finished used by. ${actionHint}`
           : action === "scaffold"
-            ? `Wrec finished scaffolding. ${clickHint}`
-          : `Wrec found no issues. ${clickHint}`;
+            ? `Wrec finished scaffolding. ${actionHint}`
+            : `Wrec found no issues. ${actionHint}`;
       statusBarItem.backgroundColor = undefined;
       return;
     default:
       statusBarItem.text = `$(check) Wrec active`;
-      statusBarItem.tooltip =
-        "Wrec Lint On Save is active. Click to lint the current file.";
+      statusBarItem.tooltip = "Wrec Lint On Save is active.";
       statusBarItem.backgroundColor = undefined;
   }
 }
@@ -636,18 +608,6 @@ async function resolveWrecCommand(projectRoot, options) {
 
   throw new Error(options.errorMessage);
 }
-
-// Creates a scaffolded component file from the built-in extension template.
-async function scaffoldComponentLocally(projectRoot, tagName) {
-  const className = toClassName(tagName);
-  const outputPath = path.join(projectRoot, `${tagName}.ts`);
-  const output = WREC_SCAFFOLD_TEMPLATE.replaceAll("{class}", className)
-    .replaceAll("{tag}", tagName);
-
-  await fs.writeFile(outputPath, output, { flag: "wx" });
-  return outputPath;
-}
-
 // Runs the used-by command for the current file and reports progress to the UI.
 async function runUsedByDocument(document, output, statusBarItem) {
   if (!shouldProcessDocument(document)) return;
@@ -753,41 +713,22 @@ async function runScaffoldComponent(output, statusBarItem) {
   );
 
   try {
-    let scaffoldOutput = `Scaffolded ${trimmedTagName}.`;
+    const scaffoldCommand = await resolveScaffoldCommand(projectRoot);
+    const { stdout, stderr } = await execFileAsync(
+      scaffoldCommand.command,
+      [...scaffoldCommand.args, trimmedTagName],
+      {
+        cwd: projectRoot,
+        env: process.env,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
 
-    try {
-      const scaffoldCommand = await resolveScaffoldCommand(projectRoot);
-      const { stdout, stderr } = await execFileAsync(
-        scaffoldCommand.command,
-        [...scaffoldCommand.args, trimmedTagName],
-        {
-          cwd: projectRoot,
-          env: process.env,
-          maxBuffer: 10 * 1024 * 1024,
-        },
-      );
-
-      if (stderr.trim()) {
-        output.appendLine(stderr.trim());
-      }
-
-      if (stdout.trim()) {
-        scaffoldOutput = stdout.trim();
-      }
-    } catch (error) {
-      if (!isMissingScaffoldCommandError(error)) {
-        throw error;
-      }
-
-      const outputPath = await scaffoldComponentLocally(
-        projectRoot,
-        trimmedTagName,
-      );
-      scaffoldOutput =
-        `Scaffolded ${trimmedTagName} at ${outputPath} using the built-in template.`;
+    if (stderr.trim()) {
+      output.appendLine(stderr.trim());
     }
 
-    output.appendLine(scaffoldOutput);
+    output.appendLine(stdout.trim() || `Scaffolded ${trimmedTagName}.`);
     output.show(true);
     updateStatusBar(statusBarItem, "success", trimmedTagName, undefined, {
       action: "scaffold",
@@ -810,7 +751,9 @@ async function runScaffoldComponent(output, statusBarItem) {
 async function resolveProjectRootForCommand() {
   const activeDocument = vscode.window.activeTextEditor?.document;
   if (activeDocument) {
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(activeDocument.uri);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(
+      activeDocument.uri,
+    );
     if (workspaceFolder) {
       return findWrecProjectRoot(
         path.dirname(activeDocument.fileName),
@@ -841,15 +784,6 @@ function shouldProcessDocument(document) {
 // Capitalizes the first character of a string for display purposes.
 function startCase(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-// Converts a custom element tag name into a component class name.
-function toClassName(tagName) {
-  return tagName
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join("");
 }
 
 module.exports = {
