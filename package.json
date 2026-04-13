@@ -2,7 +2,7 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Runs 'npx wrec-lint' when a saved file defines a class that extends Wrec.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
@@ -30,7 +30,9 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:wrec.lintCurrentFile"
+    "onCommand:wrec.lintCurrentFile",
+    "onCommand:wrec.usedByCurrentFile",
+    "onCommand:wrec.scaffoldComponent"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -38,6 +40,14 @@
       {
         "command": "wrec.lintCurrentFile",
         "title": "wrec: Lint Current File"
+      },
+      {
+        "command": "wrec.usedByCurrentFile",
+        "title": "wrec: Set usedBy Properties in Current File"
+      },
+      {
+        "command": "wrec.scaffoldComponent",
+        "title": "wrec: Scaffold New Component"
       }
     ],
     "configuration": {

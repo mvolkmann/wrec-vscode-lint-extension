@@ -33,6 +33,8 @@ The issues detected include:
 
 Lint output is written to the `Wrec Lint` output channel,
 and reported issues are surfaced as diagnostics in the editor.
+The extension also adds a status bar item so you can tell when it is active
+and when linting is in progress.
 
 ## Settings
 
@@ -41,3 +43,18 @@ and reported issues are surfaced as diagnostics in the editor.
 ## Command
 
 - `wrec: Lint Current File`
+- `wrec: Used By Current File`
+- `wrec: Scaffold Component`
+
+The scaffold command prompts for a custom element tag name and passes it to the
+Wrec scaffold script.
+
+## Status Bar
+
+The status bar item:
+
+- shows `Wrec active` after the extension activates
+- shows a spinner while linting is running
+- shows an issue count when linting finds problems
+- shows an error state if the lint command fails
+- can be clicked to lint the current file manually
