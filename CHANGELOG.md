@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added a built-in scaffold fallback so `Wrec: Scaffold New Component` still
+  works when the installed `wrec` package does not publish `wrec-scaffold`
+
 ## 0.0.1
 
 - Initial release

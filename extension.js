@@ -14,6 +14,27 @@ const WREC_USED_BY_MISSING_MESSAGE =
   "The installed wrec package for this project does not include the wrec-used-by CLI. Publish/install a wrec version that ships scripts/used-by.js and the wrec-used-by bin.";
 const WREC_SCAFFOLD_MISSING_MESSAGE =
   "The installed wrec package for this project does not include the wrec-scaffold CLI. Publish/install a wrec version that ships scripts/scaffold.js and the wrec-scaffold bin.";
+const WREC_SCAFFOLD_TEMPLATE = `import {css, html, Wrec} from 'wrec';
+
+class {class} extends Wrec {
+  static properties = {
+    name: {type: String, value: 'World'},
+  };
+
+  static css = css\`
+    p {
+      color: blue;
+      font-family: fantasy;
+    }
+  \`;
+
+  static html = html\`
+    <p>Hello, <span>this.name</span>!</p>
+  \`;
+}
+
+{class}.define('{tag}');
+`;
 const SUPPORTED_LANGUAGE_IDS = new Set([
   "javascript",
   "javascriptreact",
@@ -252,6 +273,11 @@ function errorMessageFrom(error) {
   }
 
   return String(error);
+}
+
+// Detects when scaffold should fall back to the built-in template.
+function isMissingScaffoldCommandError(error) {
+  return errorMessageFrom(error) === WREC_SCAFFOLD_MISSING_MESSAGE;
 }
 
 // Escapes special regex characters in arbitrary text before building a pattern.
@@ -611,6 +637,17 @@ async function resolveWrecCommand(projectRoot, options) {
   throw new Error(options.errorMessage);
 }
 
+// Creates a scaffolded component file from the built-in extension template.
+async function scaffoldComponentLocally(projectRoot, tagName) {
+  const className = toClassName(tagName);
+  const outputPath = path.join(projectRoot, `${tagName}.ts`);
+  const output = WREC_SCAFFOLD_TEMPLATE.replaceAll("{class}", className)
+    .replaceAll("{tag}", tagName);
+
+  await fs.writeFile(outputPath, output, { flag: "wx" });
+  return outputPath;
+}
+
 // Runs the used-by command for the current file and reports progress to the UI.
 async function runUsedByDocument(document, output, statusBarItem) {
   if (!shouldProcessDocument(document)) return;
@@ -716,22 +753,41 @@ async function runScaffoldComponent(output, statusBarItem) {
   );
 
   try {
-    const scaffoldCommand = await resolveScaffoldCommand(projectRoot);
-    const { stdout, stderr } = await execFileAsync(
-      scaffoldCommand.command,
-      [...scaffoldCommand.args, trimmedTagName],
-      {
-        cwd: projectRoot,
-        env: process.env,
-        maxBuffer: 10 * 1024 * 1024,
-      },
-    );
+    let scaffoldOutput = `Scaffolded ${trimmedTagName}.`;
 
-    if (stderr.trim()) {
-      output.appendLine(stderr.trim());
+    try {
+      const scaffoldCommand = await resolveScaffoldCommand(projectRoot);
+      const { stdout, stderr } = await execFileAsync(
+        scaffoldCommand.command,
+        [...scaffoldCommand.args, trimmedTagName],
+        {
+          cwd: projectRoot,
+          env: process.env,
+          maxBuffer: 10 * 1024 * 1024,
+        },
+      );
+
+      if (stderr.trim()) {
+        output.appendLine(stderr.trim());
+      }
+
+      if (stdout.trim()) {
+        scaffoldOutput = stdout.trim();
+      }
+    } catch (error) {
+      if (!isMissingScaffoldCommandError(error)) {
+        throw error;
+      }
+
+      const outputPath = await scaffoldComponentLocally(
+        projectRoot,
+        trimmedTagName,
+      );
+      scaffoldOutput =
+        `Scaffolded ${trimmedTagName} at ${outputPath} using the built-in template.`;
     }
 
-    output.appendLine(stdout.trim() || `Scaffolded ${trimmedTagName}.`);
+    output.appendLine(scaffoldOutput);
     output.show(true);
     updateStatusBar(statusBarItem, "success", trimmedTagName, undefined, {
       action: "scaffold",
@@ -785,6 +841,15 @@ function shouldProcessDocument(document) {
 // Capitalizes the first character of a string for display purposes.
 function startCase(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Converts a custom element tag name into a component class name.
+function toClassName(tagName) {
+  return tagName
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join("");
 }
 
 module.exports = {

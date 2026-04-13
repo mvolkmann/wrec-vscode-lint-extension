@@ -47,7 +47,8 @@ and when linting is in progress.
 - `wrec: Scaffold Component`
 
 The scaffold command prompts for a custom element tag name and passes it to the
-Wrec scaffold script.
+Wrec scaffold script. If the installed `wrec` package does not publish that CLI,
+the extension falls back to the built-in Wrec component template.
 
 ## Status Bar
 
