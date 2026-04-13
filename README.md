@@ -1,4 +1,4 @@
-# wrec
+# wrec VS Code Extension
 
 This VS Code extension adds three commands that are helpful when implementing
 [wrec](https://github.com/mvolkmann/wrec) web components.

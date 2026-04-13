@@ -1,4 +1,4 @@
-# wrec Linter
+# wrec VS Code Extension
 
 ## Publishing
 
