@@ -92,9 +92,10 @@ function activate(context) {
 
     try {
       const lintCommand = await resolveLintCommand(projectRoot);
+      const lintTargetPath = getLintTargetPath(projectRoot, document.fileName);
       const { stdout, stderr } = await execFileAsync(
         lintCommand.command,
-        [...lintCommand.args, document.fileName],
+        [...lintCommand.args, lintTargetPath],
         {
           cwd: projectRoot,
           env: process.env,
@@ -163,150 +164,8 @@ function activate(context) {
 
 function deactivate() {}
 
-function shouldProcessDocument(document) {
-  return (
-    document.uri.scheme === "file" &&
-    SUPPORTED_LANGUAGE_IDS.has(document.languageId)
-  );
-}
-
-function getConfig(document) {
-  const config = vscode.workspace.getConfiguration("wrec", document.uri);
-  return {
-    showOutput: config.get("showOutput", "onIssues"),
-  };
-}
-
 function definesWrecClass(text) {
   return WREC_CLASS_RE.test(text);
-}
-
-async function findWrecProjectRoot(startDirectory, workspaceRoot, cache) {
-  let currentDirectory = startDirectory;
-  const normalizedWorkspaceRoot = path.resolve(workspaceRoot);
-
-  while (isWithinDirectory(currentDirectory, normalizedWorkspaceRoot)) {
-    const cachedProjectRoot = cache.get(currentDirectory);
-    if (cachedProjectRoot !== undefined) {
-      return cachedProjectRoot;
-    }
-
-    const packageJsonPath = path.join(currentDirectory, "package.json");
-
-    try {
-      const packageJson = JSON.parse(
-        await fs.readFile(packageJsonPath, "utf8"),
-      );
-      if (hasWrecDependency(packageJson)) {
-        cache.set(currentDirectory, currentDirectory);
-        return currentDirectory;
-      }
-    } catch {
-      // Ignore missing or invalid package.json files while walking upward.
-    }
-
-    if (currentDirectory === normalizedWorkspaceRoot) {
-      break;
-    }
-
-    const parentDirectory = path.dirname(currentDirectory);
-    if (parentDirectory === currentDirectory) {
-      break;
-    }
-    cache.set(currentDirectory, null);
-    currentDirectory = parentDirectory;
-  }
-
-  cache.set(startDirectory, null);
-  return null;
-}
-
-function hasWrecDependency(packageJson) {
-  const dependencySections = [
-    packageJson.dependencies,
-    packageJson.devDependencies,
-    packageJson.optionalDependencies,
-    packageJson.peerDependencies,
-  ];
-
-  return dependencySections.some((section) => Boolean(section && section.wrec));
-}
-
-function isWithinDirectory(candidatePath, parentPath) {
-  const relativePath = path.relative(parentPath, candidatePath);
-  return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
-  );
-}
-
-async function resolveLintCommand(projectRoot) {
-  const localBinPath = path.join(
-    projectRoot,
-    "node_modules",
-    ".bin",
-    executableName("wrec-lint"),
-  );
-  if (await fileExists(localBinPath)) {
-    return { command: localBinPath, args: [] };
-  }
-
-  const packagedScriptPath = path.join(
-    projectRoot,
-    "node_modules",
-    "wrec",
-    "scripts",
-    "lint.js",
-  );
-  if (await fileExists(packagedScriptPath)) {
-    return { command: "node", args: [packagedScriptPath] };
-  }
-
-  throw new Error(WREC_LINT_MISSING_MESSAGE);
-}
-
-async function fileExists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function executableName(baseName) {
-  return process.platform === "win32" ? `${baseName}.cmd` : baseName;
-}
-
-function parseDiagnostics(report, document) {
-  if (!report || report.includes("no issues found")) return [];
-
-  const diagnostics = [];
-  const lines = report.split(/\r?\n/);
-  let currentSection = "";
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    if (!line.startsWith("  ") && line.endsWith(":")) {
-      currentSection = line.slice(0, -1);
-      continue;
-    }
-
-    if (!ISSUE_SECTIONS.has(currentSection)) continue;
-    if (!line.startsWith("  ")) continue;
-
-    const message = `${startCase(currentSection)}: ${line.trim()}`;
-    diagnostics.push(
-      new vscode.Diagnostic(
-        findBestRange(document, currentSection, line.trim()),
-        message,
-        diagnosticSeverity(currentSection),
-      ),
-    );
-  }
-
-  return diagnostics;
 }
 
 function diagnosticSeverity(section) {
@@ -321,6 +180,33 @@ function diagnosticSeverity(section) {
   }
 
   return vscode.DiagnosticSeverity.Warning;
+}
+
+function errorMessageFrom(error) {
+  if (error && typeof error === "object") {
+    const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
+    const message = error.message || "";
+    return stderr || message || "Wrec linter failed.";
+  }
+
+  return String(error);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function executableName(baseName) {
+  return process.platform === "win32" ? `${baseName}.cmd` : baseName;
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function findBestRange(document, section, detail) {
@@ -376,9 +262,92 @@ function findTermRange(document, term) {
   return undefined;
 }
 
+async function findWrecProjectRoot(startDirectory, workspaceRoot, cache) {
+  let currentDirectory = startDirectory;
+  const normalizedWorkspaceRoot = path.resolve(workspaceRoot);
+
+  while (isWithinDirectory(currentDirectory, normalizedWorkspaceRoot)) {
+    const cachedProjectRoot = cache.get(currentDirectory);
+    if (cachedProjectRoot !== undefined) {
+      return cachedProjectRoot;
+    }
+
+    const packageJsonPath = path.join(currentDirectory, "package.json");
+
+    try {
+      const packageJson = JSON.parse(
+        await fs.readFile(packageJsonPath, "utf8"),
+      );
+      if (hasWrecDependency(packageJson)) {
+        cache.set(currentDirectory, currentDirectory);
+        return currentDirectory;
+      }
+    } catch {
+      // Ignore missing or invalid package.json files while walking upward.
+    }
+
+    if (currentDirectory === normalizedWorkspaceRoot) {
+      break;
+    }
+
+    const parentDirectory = path.dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      break;
+    }
+    cache.set(currentDirectory, null);
+    currentDirectory = parentDirectory;
+  }
+
+  cache.set(startDirectory, null);
+  return null;
+}
+
 function firstLineRange(document) {
   const firstLine = document.lineAt(0);
   return firstLine.range;
+}
+
+function getConfig(document) {
+  const config = vscode.workspace.getConfiguration("wrec", document.uri);
+  return {
+    showOutput: config.get("showOutput", "onIssues"),
+  };
+}
+
+function getLintTargetPath(projectRoot, filePath) {
+  const relativePath = path.relative(projectRoot, filePath);
+  if (
+    relativePath &&
+    !relativePath.startsWith("..") &&
+    !path.isAbsolute(relativePath)
+  ) {
+    return relativePath;
+  }
+
+  return filePath;
+}
+
+function hasWrecDependency(packageJson) {
+  const dependencySections = [
+    packageJson.dependencies,
+    packageJson.devDependencies,
+    packageJson.optionalDependencies,
+    packageJson.peerDependencies,
+  ];
+
+  return dependencySections.some((section) => Boolean(section && section.wrec));
+}
+
+function isStaleRun(document, currentRun, runCounters) {
+  return runCounters.get(document.uri.toString()) !== currentRun;
+}
+
+function isWithinDirectory(candidatePath, parentPath) {
+  const relativePath = path.relative(parentPath, candidatePath);
+  return (
+    relativePath === "" ||
+    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+  );
 }
 
 function maybeShowOutput(output, mode, hasIssues) {
@@ -395,26 +364,71 @@ function maybeShowOutput(output, mode, hasIssues) {
   output.hide();
 }
 
-function isStaleRun(document, currentRun, runCounters) {
-  return runCounters.get(document.uri.toString()) !== currentRun;
-}
+function parseDiagnostics(report, document) {
+  if (!report || report.includes("no issues found")) return [];
 
-function errorMessageFrom(error) {
-  if (error && typeof error === "object") {
-    const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
-    const message = error.message || "";
-    return stderr || message || "Wrec linter failed.";
+  const diagnostics = [];
+  const lines = report.split(/\r?\n/);
+  let currentSection = "";
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+
+    if (!line.startsWith("  ") && line.endsWith(":")) {
+      currentSection = line.slice(0, -1);
+      continue;
+    }
+
+    if (!ISSUE_SECTIONS.has(currentSection)) continue;
+    if (!line.startsWith("  ")) continue;
+
+    const message = `${startCase(currentSection)}: ${line.trim()}`;
+    diagnostics.push(
+      new vscode.Diagnostic(
+        findBestRange(document, currentSection, line.trim()),
+        message,
+        diagnosticSeverity(currentSection),
+      ),
+    );
   }
 
-  return String(error);
+  return diagnostics;
+}
+
+async function resolveLintCommand(projectRoot) {
+  const packagedScriptPath = path.join(
+    projectRoot,
+    "node_modules",
+    "wrec",
+    "scripts",
+    "lint.js",
+  );
+  if (await fileExists(packagedScriptPath)) {
+    return { command: "node", args: [packagedScriptPath] };
+  }
+
+  const localBinPath = path.join(
+    projectRoot,
+    "node_modules",
+    ".bin",
+    executableName("wrec-lint"),
+  );
+  if (await fileExists(localBinPath)) {
+    return { command: localBinPath, args: [] };
+  }
+
+  throw new Error(WREC_LINT_MISSING_MESSAGE);
+}
+
+function shouldProcessDocument(document) {
+  return (
+    document.uri.scheme === "file" &&
+    SUPPORTED_LANGUAGE_IDS.has(document.languageId)
+  );
 }
 
 function startCase(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 module.exports = {

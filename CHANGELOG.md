@@ -13,3 +13,7 @@
 ## 0.1.2
 
 - Fixed handling of the `wrec.showOutput` setting.
+
+## 0.2.0
+
+- Fixed source file path passed to lint script.
