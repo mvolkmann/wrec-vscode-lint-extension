@@ -2,7 +2,7 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Provides commands to run three scripts provided by the wrec package.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
@@ -52,18 +52,7 @@
     ],
     "configuration": {
       "title": "wrec Lint On Save",
-      "properties": {
-        "wrec.showOutput": {
-          "type": "string",
-          "enum": [
-            "never",
-            "onIssues",
-            "always"
-          ],
-          "default": "onIssues",
-          "description": "Control when the Wrec Lint output channel is shown."
-        }
-      }
+      "properties": {}
     }
   },
   "scripts": {

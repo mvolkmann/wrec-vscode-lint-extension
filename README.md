@@ -19,7 +19,9 @@ This VS Code extension adds three commands that are helpful when implementing
   When it completes, the status bar will display
   either "Wrec ok" or "Wrec {issue-count"}".
   If any issues are discovered,
-  the "OUTPUT" panel is opened and they are displayed there.
+  they are appended to the "OUTPUT" panel,
+  which you can open manually by
+  selecting View ... Output (cmd-shift-u) to review them there.
   Also, lines where the issues are found are marked with
   a yellow squiggly and hovering over it displays an error message.
 
@@ -64,7 +66,3 @@ The lint issues detected include:
 - invalid HTML element nesting in templates
 - invalid ref attribute targets
 - duplicate ref attribute values
-
-## Lint Settings
-
-- `wrec.showOutput`: `never`, `onIssues`, or `always`

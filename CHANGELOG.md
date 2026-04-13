@@ -22,3 +22,8 @@
 
 - Added commands to scaffold a new component
   and add/modify usedBy properties.
+
+## 0.2.4
+
+Removed option to automatically show the OUTPUT panel
+when the lint command finds issues.

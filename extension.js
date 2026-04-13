@@ -61,13 +61,13 @@ function activate(context) {
 
   context.subscriptions.push(diagnostics, output, statusBarItem);
 
+  // Lints a document, updates diagnostics, and
+  // logs results to the output channel.
   async function lintDocument(document, reason = "manual") {
     if (!shouldProcessDocument(document)) {
       diagnostics.delete(document.uri);
       return;
     }
-
-    const config = getConfig(document);
 
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     if (!workspaceFolder) {
@@ -136,7 +136,6 @@ function activate(context) {
 
       const diagnosticsForFile = parseDiagnostics(stdout, document);
       diagnostics.set(document.uri, diagnosticsForFile);
-      maybeShowOutput(output, config.showOutput, diagnosticsForFile.length > 0);
       updateStatusBar(
         statusBarItem,
         diagnosticsForFile.length > 0 ? "issues" : "success",
@@ -159,7 +158,6 @@ function activate(context) {
       ]);
 
       output.appendLine(errorMessageFrom(error));
-      maybeShowOutput(output, config.showOutput, true);
       updateStatusBar(
         statusBarItem,
         "error",
@@ -375,14 +373,6 @@ function firstLineRange(document) {
   return firstLine.range;
 }
 
-// Reads extension settings for the current document.
-function getConfig(document) {
-  const config = vscode.workspace.getConfiguration("wrec", document.uri);
-  return {
-    showOutput: config.get("showOutput", "onIssues"),
-  };
-}
-
 // Converts a file path to a project-relative CLI target when possible.
 function getLintTargetPath(projectRoot, filePath) {
   const relativePath = path.relative(projectRoot, filePath);
@@ -421,21 +411,6 @@ function isWithinDirectory(candidatePath, parentPath) {
     relativePath === "" ||
     (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
   );
-}
-
-// Shows or hides the output channel based on the configured display mode.
-function maybeShowOutput(output, mode, hasIssues) {
-  if (mode === "always") {
-    output.show(true);
-    return;
-  }
-
-  if (mode === "onIssues" && hasIssues) {
-    output.show(true);
-    return;
-  }
-
-  output.hide();
 }
 
 // Updates the status bar text, tooltip, and colors for the current Wrec action.
