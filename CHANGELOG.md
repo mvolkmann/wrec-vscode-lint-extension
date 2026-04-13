@@ -27,3 +27,7 @@
 
 Removed option to automatically show the OUTPUT panel
 when the lint command finds issues.
+
+## 0.2.5
+
+Updated README.md.
