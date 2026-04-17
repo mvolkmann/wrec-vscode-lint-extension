@@ -28,8 +28,8 @@ This VS Code extension adds three commands that are helpful when implementing
 
   This adds/updates `usedBy` properties in the property configuration objects
   found in the `static properties =` object.
-  These are necessary when reactive JavaScript expressions
-  do not explicitly reference every property they use.
+  These are necessary when reactive JavaScript expressions contain calls
+  to methods that do not explicitly pass every property they use.
   In that case, wrec relies on `usedBy` properties,
   to determine when to reevaluate the expressions.
 
