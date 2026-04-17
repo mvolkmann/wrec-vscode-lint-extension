@@ -2,7 +2,7 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Provides commands to run three scripts provided by the wrec package.",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
@@ -29,10 +29,7 @@
     "javascript"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:wrec.lintCurrentFile",
-    "onCommand:wrec.usedByCurrentFile",
-    "onCommand:wrec.scaffoldComponent"
+    "onStartupFinished"
   ],
   "main": "./extension.js",
   "contributes": {

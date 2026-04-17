@@ -8,43 +8,15 @@ const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
 const WREC_CLASS_RE = /\bclass\s+[A-Za-z_$][\w$]*\s+extends\s+Wrec\b/;
-const WREC_LINT_MISSING_MESSAGE =
-  "The installed wrec package for this project does not include the wrec-lint CLI. Publish/install a wrec version that ships scripts/lint.js and the wrec-lint bin.";
-const WREC_USED_BY_MISSING_MESSAGE =
-  "The installed wrec package for this project does not include the wrec-used-by CLI. Publish/install a wrec version that ships scripts/used-by.js and the wrec-used-by bin.";
-const WREC_SCAFFOLD_MISSING_MESSAGE =
-  "The installed wrec package for this project does not include the wrec-scaffold CLI. Publish/install a wrec version that ships scripts/scaffold.js and the wrec-scaffold bin.";
+const WREC_LINT_MISSING_MESSAGE = missingCliMessage("lint");
+const WREC_SCAFFOLD_MISSING_MESSAGE = missingCliMessage("scaffold");
+const WREC_USED_BY_MISSING_MESSAGE = missingCliMessage("used-by");
 const SUPPORTED_LANGUAGE_IDS = new Set([
   "javascript",
   "javascriptreact",
   "typescript",
   "typescriptreact",
 ]);
-const ISSUE_SECTIONS = new Set([
-  "duplicate properties",
-  "extra arguments",
-  "invalid checked bindings",
-  "reserved property names",
-  "invalid usedBy references",
-  "invalid computed properties",
-  "invalid ref attributes",
-  "invalid values configurations",
-  "invalid default values",
-  "invalid form-assoc values",
-  "missing formAssociated property",
-  "missing type properties",
-  "undefined properties",
-  "undefined context functions",
-  "undefined methods",
-  "invalid event handler references",
-  "invalid useState map entries",
-  "incompatible arguments",
-  "type errors",
-  "unsupported html attributes",
-  "unsupported event names",
-  "invalid html nesting",
-]);
-
 // Activates the extension and registers commands, listeners, and UI elements.
 function activate(context) {
   const diagnostics = vscode.languages.createDiagnosticCollection("wrec");
@@ -416,92 +388,15 @@ function isWithinDirectory(candidatePath, parentPath) {
   );
 }
 
-// Updates the status bar text, tooltip, and colors for the current Wrec action.
-function updateStatusBar(
-  statusBarItem,
-  state,
-  fileName,
-  issueCount,
-  details = {},
-) {
-  const fileLabel = fileName ? path.basename(fileName) : undefined;
-  const action = details.action ?? "lint";
-  const actionHint =
-    action === "used-by"
-      ? "Use the command palette to run Set usedBy Properties."
-      : action === "scaffold"
-        ? "Use the command palette to scaffold a component."
-        : "Lint runs automatically on save.";
-
-  switch (state) {
-    case "running":
-      statusBarItem.text =
-        action === "used-by"
-          ? `$(sync~spin) Wrec used by`
-          : action === "scaffold"
-            ? `$(sync~spin) Wrec scaffold`
-            : `$(sync~spin) Wrec lint`;
-      statusBarItem.tooltip = fileLabel
-        ? action === "used-by"
-          ? `Wrec is running used by for ${fileLabel}. ${actionHint}`
-          : action === "scaffold"
-            ? `Wrec is scaffolding ${fileLabel}. ${actionHint}`
-            : `Wrec is linting ${fileLabel}. ${actionHint}`
-        : action === "used-by"
-          ? `Wrec is running used by. ${actionHint}`
-          : action === "scaffold"
-            ? `Wrec is scaffolding a component. ${actionHint}`
-            : `Wrec is linting. ${actionHint}`;
-      statusBarItem.backgroundColor = undefined;
-      return;
-    case "issues":
-      statusBarItem.text = `$(warning) Wrec ${issueCount}`;
-      statusBarItem.tooltip = fileLabel
-        ? `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"} in ${fileLabel}. ${actionHint}`
-        : `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"}. ${actionHint}`;
-      statusBarItem.backgroundColor = new vscode.ThemeColor(
-        "statusBarItem.warningBackground",
-      );
-      return;
-    case "error":
-      statusBarItem.text = `$(error) Wrec error`;
-      statusBarItem.tooltip = details.message
-        ? action === "used-by"
-          ? `Wrec used by failed: ${details.message}`
-          : action === "scaffold"
-            ? `Wrec scaffold failed: ${details.message}`
-            : `Wrec lint failed: ${details.message}`
-        : action === "used-by"
-          ? `Wrec used by failed. ${actionHint}`
-          : action === "scaffold"
-            ? `Wrec scaffold failed. ${actionHint}`
-            : `Wrec lint failed. ${actionHint}`;
-      statusBarItem.backgroundColor = new vscode.ThemeColor(
-        "statusBarItem.errorBackground",
-      );
-      return;
-    case "success":
-      statusBarItem.text = `$(pass) Wrec ok`;
-      statusBarItem.tooltip = fileLabel
-        ? action === "used-by"
-          ? `Wrec finished used by for ${fileLabel}. ${actionHint}`
-          : action === "scaffold"
-            ? `Wrec scaffolded ${fileLabel}. ${actionHint}`
-            : `Wrec found no issues in ${fileLabel}. ${actionHint}`
-        : action === "used-by"
-          ? `Wrec finished used by. ${actionHint}`
-          : action === "scaffold"
-            ? `Wrec finished scaffolding. ${actionHint}`
-            : `Wrec found no issues. ${actionHint}`;
-      statusBarItem.backgroundColor = undefined;
-      return;
-    default:
-      statusBarItem.text = `$(check) Wrec active`;
-      statusBarItem.tooltip = "Wrec Lint On Save is active.";
-      statusBarItem.backgroundColor = undefined;
-  }
+// Determines whether a report line is an issue section heading from wrec lint.
+function isIssueSectionHeader(line) {
+  return !line.startsWith("  ") && line.endsWith(":");
 }
 
+// Builds the error message for a missing wrec CLI tool.
+function missingCliMessage(tool) {
+  return `The installed wrec package for this project does not include the wrec-${tool} CLI.`;
+}
 // Converts wrec lint output into VS Code diagnostics for the active document.
 function parseDiagnostics(report, document) {
   if (!report || report.includes("no issues found")) return [];
@@ -513,12 +408,11 @@ function parseDiagnostics(report, document) {
   for (const line of lines) {
     if (!line.trim()) continue;
 
-    if (!line.startsWith("  ") && line.endsWith(":")) {
+    if (isIssueSectionHeader(line)) {
       currentSection = line.slice(0, -1);
       continue;
     }
-
-    if (!ISSUE_SECTIONS.has(currentSection)) continue;
+    if (!currentSection) continue;
     if (!line.startsWith("  ")) continue;
 
     const message = `${startCase(currentSection)}: ${line.trim()}`;
@@ -762,6 +656,92 @@ function shouldProcessDocument(document) {
 // Capitalizes the first character of a string for display purposes.
 function startCase(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Updates the status bar text, tooltip, and colors for the current Wrec action.
+function updateStatusBar(
+  statusBarItem,
+  state,
+  fileName,
+  issueCount,
+  details = {},
+) {
+  const fileLabel = fileName ? path.basename(fileName) : undefined;
+  const action = details.action ?? "lint";
+  const actionHint =
+    action === "used-by"
+      ? "Use the command palette to run Set usedBy Properties."
+      : action === "scaffold"
+        ? "Use the command palette to scaffold a component."
+        : "Lint runs automatically on save.";
+
+  switch (state) {
+    case "running":
+      statusBarItem.text =
+        action === "used-by"
+          ? `$(sync~spin) Wrec used by`
+          : action === "scaffold"
+            ? `$(sync~spin) Wrec scaffold`
+            : `$(sync~spin) Wrec lint`;
+      statusBarItem.tooltip = fileLabel
+        ? action === "used-by"
+          ? `Wrec is running used by for ${fileLabel}. ${actionHint}`
+          : action === "scaffold"
+            ? `Wrec is scaffolding ${fileLabel}. ${actionHint}`
+            : `Wrec is linting ${fileLabel}. ${actionHint}`
+        : action === "used-by"
+          ? `Wrec is running used by. ${actionHint}`
+          : action === "scaffold"
+            ? `Wrec is scaffolding a component. ${actionHint}`
+            : `Wrec is linting. ${actionHint}`;
+      statusBarItem.backgroundColor = undefined;
+      return;
+    case "issues":
+      statusBarItem.text = `$(warning) Wrec ${issueCount}`;
+      statusBarItem.tooltip = fileLabel
+        ? `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"} in ${fileLabel}. ${actionHint}`
+        : `Wrec found ${issueCount} issue${issueCount === 1 ? "" : "s"}. ${actionHint}`;
+      statusBarItem.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground",
+      );
+      return;
+    case "error":
+      statusBarItem.text = `$(error) Wrec error`;
+      statusBarItem.tooltip = details.message
+        ? action === "used-by"
+          ? `Wrec used by failed: ${details.message}`
+          : action === "scaffold"
+            ? `Wrec scaffold failed: ${details.message}`
+            : `Wrec lint failed: ${details.message}`
+        : action === "used-by"
+          ? `Wrec used by failed. ${actionHint}`
+          : action === "scaffold"
+            ? `Wrec scaffold failed. ${actionHint}`
+            : `Wrec lint failed. ${actionHint}`;
+      statusBarItem.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.errorBackground",
+      );
+      return;
+    case "success":
+      statusBarItem.text = `$(pass) Wrec ok`;
+      statusBarItem.tooltip = fileLabel
+        ? action === "used-by"
+          ? `Wrec finished used by for ${fileLabel}. ${actionHint}`
+          : action === "scaffold"
+            ? `Wrec scaffolded ${fileLabel}. ${actionHint}`
+            : `Wrec found no issues in ${fileLabel}. ${actionHint}`
+        : action === "used-by"
+          ? `Wrec finished used by. ${actionHint}`
+          : action === "scaffold"
+            ? `Wrec finished scaffolding. ${actionHint}`
+            : `Wrec found no issues. ${actionHint}`;
+      statusBarItem.backgroundColor = undefined;
+      return;
+    default:
+      statusBarItem.text = `$(check) Wrec active`;
+      statusBarItem.tooltip = "Wrec Lint On Save is active.";
+      statusBarItem.backgroundColor = undefined;
+  }
 }
 
 module.exports = {
