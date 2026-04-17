@@ -22,9 +22,12 @@ const SUPPORTED_LANGUAGE_IDS = new Set([
 ]);
 const ISSUE_SECTIONS = new Set([
   "duplicate properties",
+  "extra arguments",
+  "invalid checked bindings",
   "reserved property names",
   "invalid usedBy references",
   "invalid computed properties",
+  "invalid ref attributes",
   "invalid values configurations",
   "invalid default values",
   "invalid form-assoc values",

@@ -65,3 +65,5 @@ The lint issues detected include:
 - invalid HTML element nesting in templates
 - invalid ref attribute targets
 - duplicate ref attribute values
+- checkbox checked bindings that do not reference Boolean properties
+- radio checked bindings that do not reference String properties
