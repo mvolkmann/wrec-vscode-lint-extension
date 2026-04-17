@@ -220,6 +220,12 @@ function errorMessageFrom(error) {
   if (error && typeof error === "object") {
     const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
     const message = error.message || "";
+    if (stderr.includes("template.ts") && stderr.includes("ENOENT")) {
+      return "The installed wrec package is missing scripts/template.ts, so the scaffold command cannot run.";
+    }
+    if (message.includes("template.ts") && message.includes("ENOENT")) {
+      return "The installed wrec package is missing scripts/template.ts, so the scaffold command cannot run.";
+    }
     return stderr || message || "Wrec linter failed.";
   }
 
@@ -440,7 +446,7 @@ async function resolveLintCommand(projectRoot) {
 // Resolves how to run the wrec used-by command from the local project install.
 async function resolveUsedByCommand(projectRoot) {
   return resolveWrecCommand(projectRoot, {
-    binName: "wrec-used-by",
+    binName: "wrec-usedby",
     errorMessage: WREC_USED_BY_MISSING_MESSAGE,
     scriptName: "used-by.js",
   });
@@ -465,7 +471,7 @@ async function resolveWrecCommand(projectRoot, options) {
     options.scriptName,
   );
   if (await fileExists(packagedScriptPath)) {
-    return { command: "node", args: [packagedScriptPath] };
+    return { command: process.execPath, args: [packagedScriptPath] };
   }
 
   const localBinPath = path.join(
