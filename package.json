@@ -1,8 +1,8 @@
 {
   "name": "wrec",
   "displayName": "wrec",
-  "description": "Provides commands to run three scripts provided by the wrec package.",
-  "version": "0.2.8",
+  "description": "Provides commands to run scripts provided by the wrec package.",
+  "version": "0.3.0",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",
@@ -43,12 +43,16 @@
         "title": "wrec: Lint Current File"
       },
       {
+        "command": "wrec.addDeclareStatementsCurrentFile",
+        "title": "wrec: Add declare Statements in Current File"
+      },
+      {
         "command": "wrec.usedByCurrentFile",
         "title": "wrec: Set usedBy Properties in Current File"
       }
     ],
     "configuration": {
-      "title": "wrec Lint On Save",
+      "title": "wrec scripts",
       "properties": {}
     }
   },

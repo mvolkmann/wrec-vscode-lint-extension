@@ -24,6 +24,13 @@ This VS Code extension adds three commands that are helpful when implementing
   which you can open manually by selecting View ... Output (cmd-shift-u)
   to review them there.
 
+- wrec: Add declare Statements in Current File
+
+  This adds one `declare` statement for each property
+  declared in `static properties` based its `type` property.
+  When the `type` of a property is `Object` or `Array`, you should
+  further customize the `declare` statement type.
+
 - wrec: Set usedBy Properties in Current File
 
   This adds/updates `usedBy` properties in the property configuration objects
