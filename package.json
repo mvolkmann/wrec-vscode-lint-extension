@@ -2,7 +2,7 @@
   "name": "wrec",
   "displayName": "wrec",
   "description": "Provides commands to run scripts provided by the wrec package.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "RMarkVolkmann",
   "license": "MIT",
   "icon": "logo.png",

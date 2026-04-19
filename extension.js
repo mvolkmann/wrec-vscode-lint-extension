@@ -554,188 +554,6 @@ async function resolveProjectRootForCommand() {
     }
   }
 
-  // Resolves how to run the wrec scaffold command from the local project install.
-  async function resolveScaffoldCommand(projectRoot) {
-    return resolveWrecCommand(projectRoot, {
-      binName: "wrec-scaffold",
-      errorMessage: WREC_SCAFFOLD_MISSING_MESSAGE,
-      scriptName: "scaffold.js",
-    });
-  }
-
-  // Resolves how to run the wrec used-by command from the local project install.
-  async function resolveUsedByCommand(projectRoot) {
-    return resolveWrecCommand(projectRoot, {
-      binName: "wrec-usedby",
-      errorMessage: WREC_USED_BY_MISSING_MESSAGE,
-      scriptName: "used-by.js",
-    });
-  }
-
-  // Resolves a wrec CLI either from a packaged script or a local .bin executable.
-  async function resolveWrecCommand(projectRoot, options) {
-    const packagedScriptPath = path.join(
-      projectRoot,
-      "node_modules",
-      "wrec",
-      "scripts",
-      options.scriptName,
-    );
-    if (await fileExists(packagedScriptPath)) {
-      return { command: process.execPath, args: [packagedScriptPath] };
-    }
-
-    const localBinPath = path.join(
-      projectRoot,
-      "node_modules",
-      ".bin",
-      executableName(options.binName),
-    );
-    if (await fileExists(localBinPath)) {
-      return { command: localBinPath, args: [] };
-    }
-
-    throw new Error(options.errorMessage);
-  }
-  // Prompts for a tag name and runs the scaffold command in the current project.
-  async function runScaffoldComponent(output, statusBarItem) {
-    const projectRoot = await resolveProjectRootForCommand();
-    if (!projectRoot) {
-      updateStatusBar(statusBarItem, "idle");
-      vscode.window.showWarningMessage(
-        "The Scaffold Component command requires an open workspace that depends on wrec.",
-      );
-      return;
-    }
-
-    const tagName = await vscode.window.showInputBox({
-      ignoreFocusOut: true,
-      placeHolder: "my-element",
-      prompt: "Enter the custom element tag name to scaffold.",
-      validateInput: (value) => {
-        const trimmed = value.trim();
-        if (!trimmed) return "A tag name is required.";
-        if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/.test(trimmed)) {
-          return "Tag names must be lowercase and include at least one hyphen.";
-        }
-        return undefined;
-      },
-    });
-
-    if (tagName === undefined) return;
-
-    const trimmedTagName = tagName.trim();
-    updateStatusBar(statusBarItem, "running", trimmedTagName, undefined, {
-      action: "scaffold",
-    });
-    output.appendLine(
-      `[${new Date().toISOString()}] Scaffolding ${trimmedTagName} in ${projectRoot}`,
-    );
-
-    try {
-      const scaffoldCommand = await resolveScaffoldCommand(projectRoot);
-      const { stdout, stderr } = await execFileAsync(
-        scaffoldCommand.command,
-        [...scaffoldCommand.args, trimmedTagName],
-        {
-          cwd: projectRoot,
-          env: process.env,
-          maxBuffer: 10 * 1024 * 1024,
-        },
-      );
-
-      if (stderr.trim()) {
-        output.appendLine(stderr.trim());
-      }
-
-      output.appendLine(stdout.trim() || `Scaffolded ${trimmedTagName}.`);
-      output.show(true);
-      updateStatusBar(statusBarItem, "success", trimmedTagName, undefined, {
-        action: "scaffold",
-      });
-      vscode.window.showInformationMessage(
-        `Wrec scaffold completed for ${trimmedTagName}.`,
-      );
-    } catch (error) {
-      output.appendLine(errorMessageFrom(error));
-      output.show(true);
-      updateStatusBar(statusBarItem, "error", trimmedTagName, undefined, {
-        action: "scaffold",
-        message: errorMessageFrom(error),
-      });
-      vscode.window.showErrorMessage(errorMessageFrom(error));
-    }
-  }
-
-  // Runs the used-by command for the current file and reports progress to the UI.
-  async function runUsedByDocument(document, output, statusBarItem) {
-    if (!shouldProcessDocument(document)) return;
-
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (!workspaceFolder) return;
-
-    updateStatusBar(statusBarItem, "running", document.fileName, undefined, {
-      action: "used-by",
-    });
-
-    const projectRoot = await findWrecProjectRoot(
-      path.dirname(document.fileName),
-      workspaceFolder.uri.fsPath,
-      new Map(),
-    );
-    if (!projectRoot) {
-      updateStatusBar(statusBarItem, "idle");
-      vscode.window.showWarningMessage(
-        "The Used By command only runs in workspaces whose package.json declares a dependency on wrec.",
-      );
-      return;
-    }
-
-    if (!definesWrecClass(document.getText())) {
-      updateStatusBar(statusBarItem, "idle");
-      vscode.window.showWarningMessage(
-        "The current file does not define a class that extends Wrec.",
-      );
-      return;
-    }
-
-    output.appendLine(
-      `[${new Date().toISOString()}] Running used-by for ${document.fileName}`,
-    );
-
-    try {
-      const usedByCommand = await resolveUsedByCommand(projectRoot);
-      const targetPath = getLintTargetPath(projectRoot, document.fileName);
-      const { stdout, stderr } = await execFileAsync(
-        usedByCommand.command,
-        [...usedByCommand.args, targetPath],
-        {
-          cwd: projectRoot,
-          env: process.env,
-          maxBuffer: 10 * 1024 * 1024,
-        },
-      );
-
-      if (stderr.trim()) {
-        output.appendLine(stderr.trim());
-      }
-
-      output.appendLine(stdout.trim() || "No used-by output.");
-      output.show(true);
-      updateStatusBar(statusBarItem, "success", document.fileName, undefined, {
-        action: "used-by",
-      });
-    } catch (error) {
-      output.appendLine(errorMessageFrom(error));
-      output.show(true);
-      updateStatusBar(statusBarItem, "error", document.fileName, undefined, {
-        action: "used-by",
-        message: errorMessageFrom(error),
-      });
-      vscode.window.showErrorMessage(errorMessageFrom(error));
-    }
-  }
-
   const [workspaceFolder] = vscode.workspace.workspaceFolders ?? [];
   if (!workspaceFolder) return null;
 
@@ -744,6 +562,189 @@ async function resolveProjectRootForCommand() {
     workspaceFolder.uri.fsPath,
     new Map(),
   );
+}
+
+// Resolves how to run the wrec scaffold command from the local project install.
+async function resolveScaffoldCommand(projectRoot) {
+  return resolveWrecCommand(projectRoot, {
+    binName: "wrec-scaffold",
+    errorMessage: WREC_SCAFFOLD_MISSING_MESSAGE,
+    scriptName: "scaffold.js",
+  });
+}
+
+// Resolves how to run the wrec used-by command from the local project install.
+async function resolveUsedByCommand(projectRoot) {
+  return resolveWrecCommand(projectRoot, {
+    binName: "wrec-usedby",
+    errorMessage: WREC_USED_BY_MISSING_MESSAGE,
+    scriptName: "used-by.js",
+  });
+}
+
+// Resolves a wrec CLI either from a packaged script or a local .bin executable.
+async function resolveWrecCommand(projectRoot, options) {
+  const packagedScriptPath = path.join(
+    projectRoot,
+    "node_modules",
+    "wrec",
+    "scripts",
+    options.scriptName,
+  );
+  if (await fileExists(packagedScriptPath)) {
+    return { command: process.execPath, args: [packagedScriptPath] };
+  }
+
+  const localBinPath = path.join(
+    projectRoot,
+    "node_modules",
+    ".bin",
+    executableName(options.binName),
+  );
+  if (await fileExists(localBinPath)) {
+    return { command: localBinPath, args: [] };
+  }
+
+  throw new Error(options.errorMessage);
+}
+
+// Prompts for a tag name and runs the scaffold command in the current project.
+async function runScaffoldComponent(output, statusBarItem) {
+  const projectRoot = await resolveProjectRootForCommand();
+  if (!projectRoot) {
+    updateStatusBar(statusBarItem, "idle");
+    vscode.window.showWarningMessage(
+      "The Scaffold Component command requires an open workspace that depends on wrec.",
+    );
+    return;
+  }
+
+  const tagName = await vscode.window.showInputBox({
+    ignoreFocusOut: true,
+    placeHolder: "my-element",
+    prompt: "Enter the custom element tag name to scaffold.",
+    validateInput: (value) => {
+      const trimmed = value.trim();
+      if (!trimmed) return "A tag name is required.";
+      if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/.test(trimmed)) {
+        return "Tag names must be lowercase and include at least one hyphen.";
+      }
+      return undefined;
+    },
+  });
+
+  if (tagName === undefined) return;
+
+  const trimmedTagName = tagName.trim();
+  updateStatusBar(statusBarItem, "running", trimmedTagName, undefined, {
+    action: "scaffold",
+  });
+  output.appendLine(
+    `[${new Date().toISOString()}] Scaffolding ${trimmedTagName} in ${projectRoot}`,
+  );
+
+  try {
+    const scaffoldCommand = await resolveScaffoldCommand(projectRoot);
+    const { stdout, stderr } = await execFileAsync(
+      scaffoldCommand.command,
+      [...scaffoldCommand.args, trimmedTagName],
+      {
+        cwd: projectRoot,
+        env: process.env,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
+
+    if (stderr.trim()) {
+      output.appendLine(stderr.trim());
+    }
+
+    output.appendLine(stdout.trim() || `Scaffolded ${trimmedTagName}.`);
+    output.show(true);
+    updateStatusBar(statusBarItem, "success", trimmedTagName, undefined, {
+      action: "scaffold",
+    });
+    vscode.window.showInformationMessage(
+      `Wrec scaffold completed for ${trimmedTagName}.`,
+    );
+  } catch (error) {
+    output.appendLine(errorMessageFrom(error));
+    output.show(true);
+    updateStatusBar(statusBarItem, "error", trimmedTagName, undefined, {
+      action: "scaffold",
+      message: errorMessageFrom(error),
+    });
+    vscode.window.showErrorMessage(errorMessageFrom(error));
+  }
+}
+
+// Runs the used-by command for the current file and reports progress to the UI.
+async function runUsedByDocument(document, output, statusBarItem) {
+  if (!shouldProcessDocument(document)) return;
+
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+  if (!workspaceFolder) return;
+
+  updateStatusBar(statusBarItem, "running", document.fileName, undefined, {
+    action: "used-by",
+  });
+
+  const projectRoot = await findWrecProjectRoot(
+    path.dirname(document.fileName),
+    workspaceFolder.uri.fsPath,
+    new Map(),
+  );
+  if (!projectRoot) {
+    updateStatusBar(statusBarItem, "idle");
+    vscode.window.showWarningMessage(
+      "The Used By command only runs in workspaces whose package.json declares a dependency on wrec.",
+    );
+    return;
+  }
+
+  if (!definesWrecClass(document.getText())) {
+    updateStatusBar(statusBarItem, "idle");
+    vscode.window.showWarningMessage(
+      "The current file does not define a class that extends Wrec.",
+    );
+    return;
+  }
+
+  output.appendLine(
+    `[${new Date().toISOString()}] Running used-by for ${document.fileName}`,
+  );
+
+  try {
+    const usedByCommand = await resolveUsedByCommand(projectRoot);
+    const targetPath = getLintTargetPath(projectRoot, document.fileName);
+    const { stdout, stderr } = await execFileAsync(
+      usedByCommand.command,
+      [...usedByCommand.args, targetPath],
+      {
+        cwd: projectRoot,
+        env: process.env,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
+
+    if (stderr.trim()) {
+      output.appendLine(stderr.trim());
+    }
+
+    output.appendLine(stdout.trim() || "No used-by output.");
+    output.show(true);
+    updateStatusBar(statusBarItem, "success", document.fileName, undefined, {
+      action: "used-by",
+    });
+  } catch (error) {
+    output.appendLine(errorMessageFrom(error));
+    output.show(true);
+    updateStatusBar(statusBarItem, "error", document.fileName, undefined, {
+      action: "used-by",
+      message: errorMessageFrom(error),
+    });
+    vscode.window.showErrorMessage(errorMessageFrom(error));
+  }
 }
 
 // Limits processing to supported file-backed JavaScript and TypeScript documents.
