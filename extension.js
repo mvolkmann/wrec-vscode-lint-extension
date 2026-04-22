@@ -340,6 +340,9 @@ async function fileExists(filePath) {
 
 // Chooses the best editor range to highlight for a reported lint issue.
 function findBestRange(document, section, detail) {
+  const explicitRange = parseLocatedRange(document, detail);
+  if (explicitRange) return explicitRange;
+
   const candidateTerms = new Set();
   const quotedMatches = detail.matchAll(/"([^"]+)"/g);
   for (const match of quotedMatches) {
@@ -391,6 +394,26 @@ function findTermRange(document, term) {
   }
 
   return undefined;
+}
+
+// Parses a leading :line:column prefix from a lint detail and creates a range.
+function parseLocatedRange(document, detail) {
+  const match = detail.match(/^:(\d+):(\d+)\b/);
+  if (!match) return undefined;
+
+  const line = Number(match[1]) - 1;
+  const character = Number(match[2]) - 1;
+  if (line < 0 || character < 0 || line >= document.lineCount) {
+    return undefined;
+  }
+
+  const lineText = document.lineAt(line).text;
+  const clampedCharacter = Math.min(character, lineText.length);
+  const start = new vscode.Position(line, clampedCharacter);
+  const endCharacter =
+    clampedCharacter < lineText.length ? clampedCharacter + 1 : clampedCharacter;
+  const end = new vscode.Position(line, endCharacter);
+  return new vscode.Range(start, end);
 }
 
 // Walks upward to locate the nearest package that depends on wrec.
