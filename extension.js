@@ -409,19 +409,118 @@ function parseLocatedRange(document, detail) {
 
   const lineText = document.lineAt(line).text;
   const clampedCharacter = Math.min(character, lineText.length);
-  return rangeForLocatedPosition(document, line, lineText, clampedCharacter);
+  return rangeForLocatedPosition(document, line, clampedCharacter);
+}
+
+// Finds the closing delimiter offset for a quoted or bracketed range.
+function findClosingDelimiterOffset(text, startOffset, openingCharacter) {
+  if (
+    openingCharacter === '"' ||
+    openingCharacter === "'" ||
+    openingCharacter === "`"
+  ) {
+    return findClosingQuoteOffset(text, startOffset, openingCharacter);
+  }
+
+  if (openingCharacter === "(") {
+    return findClosingBracketOffset(text, startOffset, "(", ")");
+  }
+  if (openingCharacter === "{") {
+    return findClosingBracketOffset(text, startOffset, "{", "}");
+  }
+  if (openingCharacter === "[") {
+    return findClosingBracketOffset(text, startOffset, "[", "]");
+  }
+
+  return undefined;
+}
+
+// Finds the closing bracket for a bracketed range while skipping quoted content.
+function findClosingBracketOffset(text, startOffset, openingCharacter, closingCharacter) {
+  let depth = 1;
+
+  for (let index = startOffset + 1; index < text.length; index += 1) {
+    const character = text[index];
+    const nextCharacter = text[index + 1];
+
+    if (character === "/" && nextCharacter === "/") {
+      while (index < text.length && text[index] !== "\n") {
+        index += 1;
+      }
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index += 2;
+      while (
+        index < text.length - 1 &&
+        !(text[index] === "*" && text[index + 1] === "/")
+      ) {
+        index += 1;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (character === '"' || character === "'" || character === "`") {
+      const closingOffset = findClosingQuoteOffset(text, index, character);
+      if (closingOffset === undefined) return undefined;
+      index = closingOffset;
+      continue;
+    }
+
+    if (character === openingCharacter) {
+      depth += 1;
+      continue;
+    }
+
+    if (character === closingCharacter) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+
+  return undefined;
+}
+
+// Finds the closing quote for a quoted range while honoring escape characters.
+function findClosingQuoteOffset(text, startOffset, quoteCharacter) {
+  for (let index = startOffset + 1; index < text.length; index += 1) {
+    if (text[index] !== quoteCharacter) continue;
+    if (isEscapedAtOffset(text, index)) continue;
+    return index;
+  }
+
+  return undefined;
+}
+
+// Tells whether the character at an offset is escaped by a preceding backslash run.
+function isEscapedAtOffset(text, offset) {
+  let backslashCount = 0;
+
+  for (let index = offset - 1; index >= 0 && text[index] === "\\"; index -= 1) {
+    backslashCount += 1;
+  }
+
+  return backslashCount % 2 === 1;
 }
 
 // Expands a located lint position to a more visible token-sized editor range.
-function rangeForLocatedPosition(document, line, lineText, character) {
+function rangeForLocatedPosition(document, line, character) {
+  const lineText = document.lineAt(line).text;
   if (!lineText) {
     const position = new vscode.Position(line, 0);
     return new vscode.Range(position, position);
   }
 
-  const candidateCharacters = [character];
-  if (character > 0) {
-    candidateCharacters.push(character - 1);
+  const clampedCharacter = Math.min(character, Math.max(lineText.length - 1, 0));
+  const offset = document.offsetAt(new vscode.Position(line, clampedCharacter));
+  const delimiterRange = rangeForLocatedDelimiter(document, offset);
+  if (delimiterRange) return delimiterRange;
+
+  const candidateCharacters = [clampedCharacter];
+  if (clampedCharacter > 0) {
+    candidateCharacters.push(clampedCharacter - 1);
   }
 
   for (const candidateCharacter of candidateCharacters) {
@@ -455,6 +554,22 @@ function rangeForLocatedPosition(document, line, lineText, character) {
 
   const start = new vscode.Position(line, character);
   const end = new vscode.Position(line, Math.min(character + 1, lineText.length));
+  return new vscode.Range(start, end);
+}
+
+// Builds a range from an opening delimiter to its matching closing delimiter.
+function rangeForLocatedDelimiter(document, offset) {
+  const text = document.getText();
+  const openingCharacter = text[offset];
+  const closingOffset = findClosingDelimiterOffset(
+    text,
+    offset,
+    openingCharacter,
+  );
+  if (closingOffset === undefined) return undefined;
+
+  const start = document.positionAt(offset);
+  const end = document.positionAt(closingOffset + 1);
   return new vscode.Range(start, end);
 }
 
