@@ -58,6 +58,7 @@ The lint issues detected include:
 - incompatible declare property types
 - arithmetic and other type errors in expressions
 - invalid computed property references
+- computed property cycles
 - invalid event handler references
 - unsupported event names
 - duplicate property names
