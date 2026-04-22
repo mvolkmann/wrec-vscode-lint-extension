@@ -71,6 +71,7 @@ The lint issues detected include:
 - missing required members like `static html` and `formAssociated`
 - invalid `form-assoc` values
 - invalid `useState` map entries
+- invalid native form-control value bindings
 - unsupported HTML attributes in templates
 - invalid HTML element nesting in templates
 - invalid ref attribute targets
