@@ -416,6 +416,12 @@ function parseLocatedRange(document, detail) {
   return new vscode.Range(start, end);
 }
 
+// Removes a leading :line:column prefix from lint text before it is displayed.
+function stripLocatedDetailPrefix(detail) {
+  const strippedDetail = detail.replace(/^:\d+:\d+\|?\s*/, "").trimStart();
+  return strippedDetail || detail;
+}
+
 // Walks upward to locate the nearest package that depends on wrec.
 async function findWrecProjectRoot(startDirectory, workspaceRoot, cache) {
   let currentDirectory = startDirectory;
@@ -530,10 +536,12 @@ function parseDiagnostics(report, document) {
     if (!currentSection) continue;
     if (!line.startsWith("  ")) continue;
 
-    const message = `${startCase(currentSection)}: ${line.trim()}`;
+    const detail = line.trim();
+    const cleanedDetail = stripLocatedDetailPrefix(detail);
+    const message = `${startCase(currentSection)}: ${cleanedDetail}`;
     diagnostics.push(
       new vscode.Diagnostic(
-        findBestRange(document, currentSection, line.trim()),
+        findBestRange(document, currentSection, detail),
         message,
         diagnosticSeverity(currentSection),
       ),
