@@ -409,10 +409,52 @@ function parseLocatedRange(document, detail) {
 
   const lineText = document.lineAt(line).text;
   const clampedCharacter = Math.min(character, lineText.length);
-  const start = new vscode.Position(line, clampedCharacter);
-  const endCharacter =
-    clampedCharacter < lineText.length ? clampedCharacter + 1 : clampedCharacter;
-  const end = new vscode.Position(line, endCharacter);
+  return rangeForLocatedPosition(document, line, lineText, clampedCharacter);
+}
+
+// Expands a located lint position to a more visible token-sized editor range.
+function rangeForLocatedPosition(document, line, lineText, character) {
+  if (!lineText) {
+    const position = new vscode.Position(line, 0);
+    return new vscode.Range(position, position);
+  }
+
+  const candidateCharacters = [character];
+  if (character > 0) {
+    candidateCharacters.push(character - 1);
+  }
+
+  for (const candidateCharacter of candidateCharacters) {
+    const position = new vscode.Position(line, candidateCharacter);
+    const wordRange = document.getWordRangeAtPosition(position, /[\w$-]+/);
+    if (wordRange) return wordRange;
+  }
+
+  if (character >= lineText.length) {
+    const start = new vscode.Position(line, lineText.length - 1);
+    const end = new vscode.Position(line, lineText.length);
+    return new vscode.Range(start, end);
+  }
+
+  let startCharacter = character;
+  let endCharacter = character;
+
+  while (startCharacter > 0 && !/\s/.test(lineText[startCharacter - 1])) {
+    startCharacter -= 1;
+  }
+
+  while (endCharacter < lineText.length && !/\s/.test(lineText[endCharacter])) {
+    endCharacter += 1;
+  }
+
+  if (endCharacter > startCharacter) {
+    const start = new vscode.Position(line, startCharacter);
+    const end = new vscode.Position(line, endCharacter);
+    return new vscode.Range(start, end);
+  }
+
+  const start = new vscode.Position(line, character);
+  const end = new vscode.Position(line, Math.min(character + 1, lineText.length));
   return new vscode.Range(start, end);
 }
 
