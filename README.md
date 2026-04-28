@@ -18,7 +18,8 @@ This VS Code extension adds three commands that are helpful when implementing
   While this is running, "Wrec lint" will be displayed in the status bar.
   When it completes, the status bar will display
   either "Wrec ok" or "Wrec {issue-count"}".
-  Lines where issues are found are marked with yellow squigglies
+  Lines where issues are found are
+  marked with yellow (warning) or red (error) squigglies
   and hovering over those displays an error message.
   The issues are also appended to the "OUTPUT" panel,
   which you can open manually by selecting View ... Output (cmd-shift-u)
